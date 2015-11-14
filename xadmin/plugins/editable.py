@@ -3,7 +3,7 @@ from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
 from django.db import models, transaction
 from django.forms.models import modelform_factory
 from django.http import Http404, HttpResponse
-from django.utils.encoding import force_str, smart_unicode
+from django.utils.encoding import force_str, smart_text
 from django.utils.html import escape, conditional_escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext as _
@@ -32,7 +32,7 @@ class EditablePlugin(BaseAdminPlugin):
         return active
 
     def result_item(self, item, obj, field_name, row):
-        if self.list_editable and item.field and item.field.editable and (field_name in self.list_editable):            
+        if self.list_editable and item.field and item.field.editable and (field_name in self.list_editable):
             pk = getattr(obj, obj._meta.pk.attname)
             field_label = label_for_field(field_name, obj,
                                           model_admin=self.admin_view,
@@ -43,7 +43,7 @@ class EditablePlugin(BaseAdminPlugin):
             item.btns.append((
                 '<a class="editable-handler" title="%s" data-editable-field="%s" data-editable-loadurl="%s">' +
                 '<i class="fa fa-edit"></i></a>') %
-                (_(u"Enter %s") % field_label, field_name, self.admin_view.model_admin_url('patch', pk) + '?fields=' + field_name))
+                (_("Enter %s") % field_label, field_name, self.admin_view.model_admin_url('patch', pk) + '?fields=' + field_name))
 
             if field_name not in self.editable_need_fields:
                 self.editable_need_fields[field_name] = item.field
@@ -92,7 +92,7 @@ class EditPatchView(ModelFormAdminView, ListAdminView):
                     allow_tags = True
                     text = boolean_icon(value)
                 else:
-                    text = smart_unicode(value)
+                    text = smart_text(value)
             else:
                 if isinstance(f.rel, models.ManyToOneRel):
                     field_val = getattr(self.org_obj, f.name)
@@ -132,7 +132,7 @@ class EditPatchView(ModelFormAdminView, ListAdminView):
     @transaction.atomic
     def post(self, request, object_id):
         model_fields = [f.name for f in self.opts.fields]
-        fields = [f for f in request.POST.keys() if f in model_fields]
+        fields = [f for f in list(request.POST.keys()) if f in model_fields]
         defaults = {
             "form": self.form,
             "fields": fields,

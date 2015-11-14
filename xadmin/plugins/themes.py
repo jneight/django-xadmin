@@ -1,5 +1,5 @@
 #coding:utf-8
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from django.template import loader
 from django.core.cache import cache
 from django.utils.translation import ugettext as _
@@ -30,7 +30,7 @@ class ThemePlugin(BaseAdminPlugin):
             except Exception:
                 pass
         if '_theme' in self.request.COOKIES:
-            return urllib.unquote(self.request.COOKIES['_theme'])
+            return urllib.parse.unquote(self.request.COOKIES['_theme'])
         return self.default_theme
 
     def get_context(self, context):
@@ -44,9 +44,9 @@ class ThemePlugin(BaseAdminPlugin):
     # Block Views
     def block_top_navmenu(self, context, nodes):
 
-        themes = [{'name': _(u"Default"), 'description': _(
-            u"Default bootstrap theme"), 'css': self.default_theme},
-            {'name': _(u"Bootstrap2"), 'description': _(u"Bootstrap 2.x theme"),
+        themes = [{'name': _("Default"), 'description': _(
+            "Default bootstrap theme"), 'css': self.default_theme},
+            {'name': _("Bootstrap2"), 'description': _("Bootstrap 2.x theme"),
             'css': self.bootstrap2_theme}]
         select_css = context.get('site_theme', self.default_theme)
 
@@ -60,7 +60,7 @@ class ThemePlugin(BaseAdminPlugin):
             else:
                 ex_themes = []
                 try:
-                    watch_themes = json.loads(urllib.urlopen(
+                    watch_themes = json.loads(urllib.request.urlopen(
                         'http://api.bootswatch.com/3/').read())['themes']
                     ex_themes.extend([
                         {'name': t['name'], 'description': t['description'],

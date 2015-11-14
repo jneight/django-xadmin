@@ -39,13 +39,13 @@ class ChangeFieldWidgetWrapper(forms.Widget):
     def render(self, name, value, attrs=None):
         output = []
         is_required = self.widget.is_required
-        output.append(u'<label class="btn btn-info btn-xs">'
+        output.append('<label class="btn btn-info btn-xs">'
             '<input type="checkbox" class="batch-field-checkbox" name="%s" value="%s"%s/> %s</label>' %
             (BATCH_CHECKBOX_NAME, name, (is_required and ' checked="checked"' or ''), _('Change this field')))
         output.extend([('<div class="control-wrap" style="margin-top: 10px;%s" id="id_%s_wrap_container">' %
             ((not is_required and 'display: none;' or ''), name)),
             self.widget.render(name, value, attrs), '</div>'])
-        return mark_safe(u''.join(output))
+        return mark_safe(''.join(output))
 
     def build_attrs(self, extra_attrs=None, **kwargs):
         "Helper function for building an attribute dictionary."
@@ -62,7 +62,7 @@ class BatchChangeAction(BaseActionView):
 
     action_name = "change_selected"
     description = ugettext_lazy(
-        u'Batch Change selected %(verbose_name_plural)s')
+        'Batch Change selected %(verbose_name_plural)s')
 
     batch_change_form_template = None
 
@@ -82,7 +82,7 @@ class BatchChangeAction(BaseActionView):
 
         if n:
             for obj in queryset:
-                for f, v in data.items():
+                for f, v in list(data.items()):
                     f.save_form_data(obj, v)
                 obj.save()
             self.message_user(_("Successfully change %(count)d %(items)s.") % {
@@ -122,7 +122,7 @@ class BatchChangeAction(BaseActionView):
         helper = FormHelper()
         helper.form_tag = False
         helper.add_layout(Layout(Container(Col('full',
-            Fieldset("", *self.form_obj.fields.keys(), css_class="unsort no_title"), horizontal=True, span=12)
+            Fieldset("", *list(self.form_obj.fields.keys()), css_class="unsort no_title"), horizontal=True, span=12)
         )))
         self.form_obj.helper = helper
         count = len(queryset)

@@ -50,7 +50,7 @@ class DeleteAdminView(ModelAdminView):
         self.delete_model()
 
         response = self.post_response()
-        if isinstance(response, basestring):
+        if isinstance(response, str):
             return HttpResponseRedirect(response)
         else:
             return response
@@ -74,7 +74,7 @@ class DeleteAdminView(ModelAdminView):
             "title": title,
             "object": self.obj,
             "deleted_objects": self.deleted_objects,
-            "model_count": dict(self.model_count).items(),
+            "model_count": list(dict(self.model_count).items()),
             "perms_lacking": self.perms_needed,
             "protected": self.protected,
         }

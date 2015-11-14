@@ -1,10 +1,11 @@
+import collections
+
 from django import forms
 from django.core.exceptions import PermissionDenied
 from django.db import router
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader
 from django.template.response import TemplateResponse
-from django.utils.datastructures import SortedDict
 from django.utils.encoding import force_str
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext as _, ungettext
@@ -13,6 +14,7 @@ from xadmin.sites import site
 from xadmin.util import model_format_dict, get_deleted_objects, model_ngettext
 from xadmin.views import BaseAdminPlugin, ListAdminView
 from xadmin.views.base import filter_hook, ModelAdminView
+import collections
 
 
 ACTION_CHECKBOX_NAME = '_selected_action'
@@ -51,7 +53,7 @@ class BaseActionView(ModelAdminView):
 class DeleteSelectedAction(BaseActionView):
 
     action_name = "delete_selected"
-    description = _(u'Delete selected %(verbose_name_plural)s')
+    description = _('Delete selected %(verbose_name_plural)s')
 
     delete_confirmation_template = None
     delete_selected_confirmation_template = None
@@ -111,7 +113,7 @@ class DeleteSelectedAction(BaseActionView):
             "title": title,
             "objects_name": objects_name,
             "deletable_objects": [deletable_objects],
-            "model_count": dict(model_count).items(),
+            "model_count": list(dict(model_count).items()),
             'queryset': queryset,
             "perms_lacking": perms_needed,
             "protected": protected,
@@ -210,7 +212,7 @@ class ActionPlugin(BaseAdminPlugin):
 
     def get_actions(self):
         if self.actions is None:
-            return SortedDict()
+            return collections.OrderedDict()
 
         actions = [self.get_action(action) for action in self.global_actions]
 
@@ -222,10 +224,10 @@ class ActionPlugin(BaseAdminPlugin):
                 [self.get_action(action) for action in class_actions])
 
         # get_action might have returned None, so filter any of those out.
-        actions = filter(None, actions)
+        actions = [_f for _f in actions if _f]
 
-        # Convert the actions into a SortedDict keyed by name.
-        actions = SortedDict([
+        # Convert the actions into a collections.OrderedDict keyed by name.
+        actions = collections.OrderedDict([
             (name, (ac, name, desc, icon))
             for ac, name, desc, icon in actions
         ])
@@ -238,7 +240,7 @@ class ActionPlugin(BaseAdminPlugin):
         tuple (name, description).
         """
         choices = []
-        for ac, name, description, icon in self.actions.itervalues():
+        for ac, name, description, icon in self.actions.values():
             choice = (name, description % model_format_dict(self.opts), icon)
             choices.append(choice)
         return choices
@@ -249,7 +251,7 @@ class ActionPlugin(BaseAdminPlugin):
                 return None
             return action, getattr(action, 'action_name'), getattr(action, 'description'), getattr(action, 'icon')
 
-        elif callable(action):
+        elif isinstance(action, collections.Callable):
             func = action
             action = action.__name__
 
@@ -273,7 +275,7 @@ class ActionPlugin(BaseAdminPlugin):
         return item
 
     def result_item(self, item, obj, field_name, row):
-        if item.field is None and field_name == u'action_checkbox':
+        if item.field is None and field_name == 'action_checkbox':
             item.classes.append("action-checkbox")
         return item
 

@@ -3,6 +3,8 @@ import copy
 import functools
 import datetime
 import decimal
+import collections
+
 from functools import update_wrapper
 from inspect import getargspec
 
@@ -17,9 +19,8 @@ from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 from django.template import Context, Template
 from django.template.response import TemplateResponse
-from django.utils.datastructures import SortedDict
 from django.utils.decorators import method_decorator, classonlymethod
-from django.utils.encoding import smart_unicode
+from django.utils.encoding import smart_text
 from django.utils.http import urlencode
 from django.utils.itercompat import is_iterable
 from django.utils.safestring import mark_safe
@@ -28,6 +29,7 @@ from django.utils.translation import ugettext as _
 from django.views.decorators.csrf import csrf_protect
 from django.views.generic import View
 from xadmin.util import static, json, vendor, sortkeypicker
+import collections
 
 
 csrf_protect_m = method_decorator(csrf_protect)
@@ -50,7 +52,7 @@ def filter_chain(filters, token, func, *args, **kwargs):
                 if result is None:
                     return fm()
                 else:
-                    raise IncorrectPluginArg(u'Plugin filter method need a arg to receive parent method result.')
+                    raise IncorrectPluginArg('Plugin filter method need a arg to receive parent method result.')
             else:
                 return fm(func if fargs[1] == '__' else func(), *args, **kwargs)
         return filter_chain(filters, token - 1, _inner_method, *args, **kwargs)
@@ -68,7 +70,7 @@ def filter_hook(func):
 
         if self.plugins:
             filters = [(getattr(getattr(p, tag), 'priority', 10), getattr(p, tag))
-                       for p in self.plugins if callable(getattr(p, tag, None))]
+                       for p in self.plugins if isinstance(getattr(p, tag, None), collections.Callable)]
             filters = [f for p, f in sorted(filters, key=lambda x:x[0])]
             return filter_chain(filters, len(filters) - 1, _inner_method, *args, **kwargs)
         else:
@@ -84,7 +86,7 @@ def inclusion_tag(file_name, context_class=Context, takes_context=False):
             from django.template.loader import get_template, select_template
             if isinstance(file_name, Template):
                 t = file_name
-            elif not isinstance(file_name, basestring) and is_iterable(file_name):
+            elif not isinstance(file_name, str) and is_iterable(file_name):
                 t = select_template(file_name)
             else:
                 t = get_template(file_name)
@@ -116,7 +118,7 @@ class JSONEncoder(DjangoJSONEncoder):
             try:
                 return super(JSONEncoder, self).default(o)
             except Exception:
-                return smart_unicode(o)
+                return smart_text(o)
 
 
 class BaseAdminObject(object):
@@ -149,12 +151,12 @@ class BaseAdminObject(object):
             new_params = {}
         if remove is None:
             remove = []
-        p = dict(self.request.GET.items()).copy()
+        p = dict(list(self.request.GET.items())).copy()
         for r in remove:
-            for k in p.keys():
+            for k in list(p.keys()):
                 if k.startswith(r):
                     del p[k]
-        for k, v in new_params.items():
+        for k, v in list(new_params.items()):
             if v is None:
                 if k in p:
                     del p[k]
@@ -167,19 +169,19 @@ class BaseAdminObject(object):
             new_params = {}
         if remove is None:
             remove = []
-        p = dict(self.request.GET.items()).copy()
+        p = dict(list(self.request.GET.items())).copy()
         for r in remove:
-            for k in p.keys():
+            for k in list(p.keys()):
                 if k.startswith(r):
                     del p[k]
-        for k, v in new_params.items():
+        for k, v in list(new_params.items()):
             if v is None:
                 if k in p:
                     del p[k]
             else:
                 p[k] = v
         return mark_safe(''.join(
-            '<input type="hidden" name="%s" value="%s"/>' % (k, v) for k, v in p.items() if v))
+            '<input type="hidden" name="%s" value="%s"/>' % (k, v) for k, v in list(p.items()) if v))
 
     def render_response(self, content, response_type='json'):
         if response_type == 'json':
@@ -197,7 +199,7 @@ class BaseAdminObject(object):
         Send a message to the user. The default implementation
         posts a message using the django.contrib.messages backend.
         """
-        if hasattr(messages, level) and callable(getattr(messages, level)):
+        if hasattr(messages, level) and isinstance(getattr(messages, level), collections.Callable):
             getattr(messages, level)(self.request, message)
 
     def static(self, path):
@@ -318,15 +320,15 @@ class CommAdminView(BaseAdminView):
                     get_url(m, had_urls)
         get_url({'menus': site_menu}, had_urls)
 
-        nav_menu = SortedDict()
+        nav_menu = collections.OrderedDict()
 
-        for model, model_admin in self.admin_site._registry.items():
+        for model, model_admin in list(self.admin_site._registry.items()):
             if getattr(model_admin, 'hidden_menu', False):
                 continue
             app_label = model._meta.app_label
             app_icon = None
             model_dict = {
-                'title': unicode(capfirst(model._meta.verbose_name_plural)),
+                'title': str(capfirst(model._meta.verbose_name_plural)),
                 'url': self.get_model_url(model, "changelist"),
                 'icon': self.get_model_icon(model),
                 'perm': self.get_model_perm(model, 'view'),
@@ -340,7 +342,7 @@ class CommAdminView(BaseAdminView):
                 nav_menu[app_key]['menus'].append(model_dict)
             else:
                 # Find app title
-                app_title = unicode(app_label.title())
+                app_title = str(app_label.title())
                 if app_label.lower() in self.apps_label_title:
                     app_title = self.apps_label_title[app_label.lower()]
                 else:
@@ -372,10 +374,10 @@ class CommAdminView(BaseAdminView):
             if 'first_url' not in app_menu and model_dict.get('url'):
                 app_menu['first_url'] = model_dict['url']
 
-        for menu in nav_menu.values():
+        for menu in list(nav_menu.values()):
             menu['menus'].sort(key=sortkeypicker(['order', 'title']))
 
-        nav_menu = nav_menu.values()
+        nav_menu = list(nav_menu.values())
         nav_menu.sort(key=lambda x: x['title'])
 
         site_menu.extend(nav_menu)
@@ -386,38 +388,38 @@ class CommAdminView(BaseAdminView):
     def get_context(self):
         context = super(CommAdminView, self).get_context()
 
-        if not settings.DEBUG and 'nav_menu' in self.request.session:
-            nav_menu = json.loads(self.request.session['nav_menu'])
-        else:
-            menus = copy.copy(self.get_nav_menu())
+        #if not settings.DEBUG and 'nav_menu' in self.request.session:
+            #nav_menu = json.loads(self.request.session['nav_menu'])
+        #else:
+        menus = copy.copy(self.get_nav_menu())
 
-            def check_menu_permission(item):
-                need_perm = item.pop('perm', None)
-                if need_perm is None:
-                    return True
-                elif callable(need_perm):
-                    return need_perm(self.user)
-                elif need_perm == 'super':
-                    return self.user.is_superuser
-                else:
-                    return self.user.has_perm(need_perm)
+        def check_menu_permission(item):
+            need_perm = item.pop('perm', None)
+            if need_perm is None:
+                return True
+            elif isinstance(need_perm, collections.Callable):
+                return need_perm(self.user)
+            elif need_perm == 'super':
+                return self.user.is_superuser
+            else:
+                return self.user.has_perm(need_perm)
 
-            def filter_item(item):
-                if 'menus' in item:
-                    before_filter_length = len(item['menus'])
-                    item['menus'] = [filter_item(
-                        i) for i in item['menus'] if check_menu_permission(i)]
-                    after_filter_length = len(item['menus'])
-                    if after_filter_length == 0 and before_filter_length > 0:
-                        return None
-                return item
+        def filter_item(item):
+            if 'menus' in item:
+                before_filter_length = len(item['menus'])
+                item['menus'] = [filter_item(
+                    i) for i in item['menus'] if check_menu_permission(i)]
+                after_filter_length = len(item['menus'])
+                if after_filter_length == 0 and before_filter_length > 0:
+                    return None
+            return item
 
-            nav_menu = [filter_item(item) for item in menus if check_menu_permission(item)]
-            nav_menu = filter(lambda x:x, nav_menu)
+        nav_menu = [filter_item(item) for item in menus if check_menu_permission(item)]
+        nav_menu = [x for x in nav_menu if x]
 
-            if not settings.DEBUG:
-                self.request.session['nav_menu'] = json.dumps(nav_menu)
-                self.request.session.modified = True
+        if not settings.DEBUG:
+            self.request.session['nav_menu'] = json.dumps(nav_menu)
+            self.request.session.modified = True
 
         def check_selected(menu, path):
             selected = False
@@ -441,8 +443,8 @@ class CommAdminView(BaseAdminView):
         context.update({
             'menu_template': self.menu_template,
             'nav_menu': nav_menu,
-            'site_title': self.site_title or _(u'Django Xadmin'),
-            'site_footer': self.site_footer or _(u'my-company.inc'),
+            'site_title': self.site_title or _('Django Xadmin'),
+            'site_footer': self.site_footer or _('my-company.inc'),
             'breadcrumbs': self.get_breadcrumb()
         })
 

@@ -27,7 +27,7 @@ class RelateMenuPlugin(BaseAdminPlugin):
         for r in self.opts.get_all_related_objects() + self.opts.get_all_related_many_to_many_objects():
             if self.related_list and (r.get_accessor_name() not in self.related_list):
                 continue
-            if r.model not in self.admin_site._registry.keys():
+            if r.model not in list(self.admin_site._registry.keys()):
                 continue
             has_view_perm = self.has_model_perm(r.model, 'view')
             has_add_perm = self.has_model_perm(r.model, 'add')
@@ -96,7 +96,7 @@ class RelateObject(object):
         field = self.opts.get_field_by_name(parts[0])[0]
 
         if not hasattr(field, 'rel') and not isinstance(field, ForeignObjectRel):
-            raise Exception(u'Relate Lookup field must a related field')
+            raise Exception('Relate Lookup field must a related field')
 
         if hasattr(field, 'rel'):
             self.to_model = field.rel.to
@@ -121,14 +121,18 @@ class RelateObject(object):
         else:
             to_model_name = force_str(self.to_model._meta.verbose_name)
 
-        return mark_safe(u"<span class='rel-brand'>%s <i class='fa fa-caret-right'></i></span> %s" % (to_model_name, force_str(self.opts.verbose_name_plural)))
+        return mark_safe("<span class='rel-brand'>%s <i class='fa fa-caret-right'></i></span> %s" % (to_model_name, force_str(self.opts.verbose_name_plural)))
 
 
 class BaseRelateDisplayPlugin(BaseAdminPlugin):
 
     def init_request(self, *args, **kwargs):
         self.relate_obj = None
-        for k, v in self.request.REQUEST.items():
+        if self.request.method == 'POST':
+            data = self.request.POST
+        else:
+            data = self.request.GET
+        for k, v in data.items():
             if smart_str(k).startswith(RELATE_PREFIX):
                 self.relate_obj = RelateObject(
                     self.admin_view, smart_str(k)[len(RELATE_PREFIX):], v)
@@ -180,7 +184,7 @@ class EditRelateDisplayPlugin(BaseRelateDisplayPlugin):
         return datas
 
     def post_response(self, response):
-        if isinstance(response, basestring) and response != self.get_admin_url('index'):
+        if isinstance(response, str) and response != self.get_admin_url('index'):
             return self._get_url(response)
         return response
 
@@ -196,7 +200,7 @@ class EditRelateDisplayPlugin(BaseRelateDisplayPlugin):
 class DeleteRelateDisplayPlugin(BaseRelateDisplayPlugin):
 
     def post_response(self, response):
-        if isinstance(response, basestring) and response != self.get_admin_url('index'):
+        if isinstance(response, str) and response != self.get_admin_url('index'):
             return self._get_url(response)
         return response
 

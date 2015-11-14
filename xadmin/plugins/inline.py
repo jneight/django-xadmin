@@ -3,10 +3,11 @@ import inspect
 from django import forms
 from django.forms.formsets import all_valid, DELETION_FIELD_NAME
 from django.forms.models import inlineformset_factory, BaseInlineFormSet, modelform_defines_fields
-from django.contrib.contenttypes.generic import BaseGenericInlineFormSet, generic_inlineformset_factory
+from django.contrib.contenttypes.forms import BaseGenericInlineFormSet, generic_inlineformset_factory
 from django.template import loader
 from django.template.loader import render_to_string
 from django.contrib.auth import get_permission_codename
+from crispy_forms.utils import TEMPLATE_PACK
 from xadmin.layout import FormHelper, Layout, flatatt, Container, Column, Field, Fieldset
 from xadmin.sites import site
 from xadmin.views import BaseAdminPlugin, ModelFormAdminView, DetailAdminView, filter_hook
@@ -21,7 +22,7 @@ class ShowField(Field):
         if admin_view.style == 'table':
             self.template = "xadmin/layout/field_value_td.html"
 
-    def render(self, form, form_style, context):
+    def render(self, form, form_style, context, template_pack=None):
         html = ''
         detail = form.detail
         for field in self.fields:
@@ -34,7 +35,7 @@ class ShowField(Field):
 
 class DeleteField(Field):
 
-    def render(self, form, form_style, context):
+    def render(self, form, form_style, context, template_pack=None):
         if form.instance.pk:
             self.attrs['type'] = 'hidden'
             return super(DeleteField, self).render(form, form_style, context)
@@ -93,13 +94,13 @@ class TableInlineStyle(InlineStyle):
 
     def update_layout(self, helper):
         helper.add_layout(
-            Layout(*[TDField(f) for f in self.formset[0].fields.keys()]))
+            Layout(*[TDField(f) for f in list(self.formset[0].fields.keys())]))
 
     def get_attrs(self):
         fields = []
         readonly_fields = []
         if len(self.formset):
-            fields = [f for k, f in self.formset[0].fields.items() if k != DELETION_FIELD_NAME]
+            fields = [f for k, f in list(self.formset[0].fields.items()) if k != DELETION_FIELD_NAME]
             readonly_fields = [f for f in getattr(self.formset[0], 'readonly_fields', [])]
         return {
             'fields': fields,
@@ -113,7 +114,7 @@ def replace_field_to_value(layout, av):
         for i, lo in enumerate(layout.fields):
             if isinstance(lo, Field) or issubclass(lo.__class__, Field):
                 layout.fields[i] = ShowField(av, *lo.fields, **lo.attrs)
-            elif isinstance(lo, basestring):
+            elif isinstance(lo, str):
                 layout.fields[i] = ShowField(av, lo)
             elif hasattr(lo, 'get_field_names'):
                 replace_field_to_value(lo, av)
@@ -188,7 +189,6 @@ class InlineModelAdmin(ModelFormAdminView):
         helper.form_tag = False
         # override form method to prevent render csrf_token in inline forms, see template 'bootstrap/whole_uni_form.html'
         helper.form_method = 'get'
-
         style = style_manager.get_style(
             'one' if self.max_num == 1 else self.style)(self, instance)
         style.name = self.style
@@ -197,13 +197,13 @@ class InlineModelAdmin(ModelFormAdminView):
             layout = copy.deepcopy(self.form_layout)
 
             if layout is None:
-                layout = Layout(*instance[0].fields.keys())
+                layout = Layout(*list(instance[0].fields.keys()))
             elif type(layout) in (list, tuple) and len(layout) > 0:
                 layout = Layout(*layout)
 
                 rendered_fields = [i[1] for i in layout.get_field_names()]
-                layout.extend([f for f in instance[0]
-                              .fields.keys() if f not in rendered_fields])
+                layout.extend([f for f in list(instance[0]
+                              .fields.keys()) if f not in rendered_fields])
 
             helper.add_layout(layout)
             style.update_layout(helper)
@@ -225,7 +225,7 @@ class InlineModelAdmin(ModelFormAdminView):
                         label = None
                         if readonly_field in inst._meta.get_all_field_names():
                             label = inst._meta.get_field_by_name(readonly_field)[0].verbose_name
-                            value = unicode(getattr(inst, readonly_field))
+                            value = str(getattr(inst, readonly_field))
                         elif inspect.ismethod(getattr(inst, readonly_field, None)):
                             value = getattr(inst, readonly_field)()
                             label = getattr(getattr(inst, readonly_field), 'short_description', readonly_field)
@@ -328,11 +328,20 @@ class InlineFormset(Fieldset):
         self.opts = formset.model._meta
         self.flat_attrs = flatatt(kwargs)
         self.extra_attrs = formset.style.get_attrs()
+        self.link_template = '%s/layout/tab-link.html'
 
-    def render(self, form, form_style, context):
+    def render(self, form, form_style, context, template_pack=None):
         return render_to_string(
             self.template, dict({'formset': self, 'prefix': self.formset.prefix, 'inline_style': self.inline_style}, **self.extra_attrs),
             context_instance=context)
+
+    def render_link(self, template_pack=TEMPLATE_PACK, **kwargs):
+        """
+        Render the link for the tab-pane. It must be called after render so css_class is updated
+        with active if needed.
+        """
+        link_template = self.link_template % template_pack
+        return render_to_string(link_template, {'link': self})
 
 
 class Inline(Fieldset):
@@ -341,7 +350,7 @@ class Inline(Fieldset):
         self.model = rel_model
         self.fields = []
 
-    def render(self, form, form_style, context):
+    def render(self, form, form_style, context, template_pack=None):
         return ""
 
 
@@ -412,7 +421,7 @@ class InlineFormsetPlugin(BaseAdminPlugin):
         for fs in self.formsets:
             errors.extend(fs.non_form_errors())
             for errors_in_inline_form in fs.errors:
-                errors.extend(errors_in_inline_form.values())
+                errors.extend(list(errors_in_inline_form.values()))
         return errors
 
     def get_form_layout(self, layout):
