@@ -43,14 +43,13 @@
       timeRepr: gettext('%T')
     }
 
-    $.fn.datepicker.dates['xadmin'] = $.date_local;
 
     $.fn.exform.renders.push(function(f){
       f.find('.input-group.date input').each(function(e){
         var dp = $(this).datepicker({format: $.date_local.dateJSFormat, language: 'xadmin', todayBtn: "linked", autoclose: true})
           .data('datepicker');
         $(this).parent().find('button').click(function(e){
-          dp.update(new Date());
+            $(this).parent().parent().find('input').val('');
         })
       })
       if($.fn.timepicker){
@@ -58,14 +57,20 @@
           var el = $(this).find('input');
           var value = el.val();
           var tp = el.timepicker({
-            minuteStep: 1,
-            showSeconds: true,
+            minuteStep: 15,
+            disableFocus: true,
+            icons: {
+                up: 'fa fa-chevron-up',
+                down: 'fa fa-chevron-down',
+            },
+            showSeconds: false,
             showMeridian: false,
             defaultTime: false
           }).data('timepicker');
           $(this).find('button').click(function(e){
             tp.$element.val("");
-            tp.setDefaultTime('current');
+            $(this).parent().parent().find('input').val('');
+            tp.setDefaultTime("");
             tp.update();
           })
         })
